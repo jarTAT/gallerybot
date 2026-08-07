@@ -12,6 +12,7 @@ import { createPhotoRecord, addImageToPhoto, getPhoto } from './store';
 import { getSession, setSession, clearSession } from './session';
 
 const MAX_IMAGES_PER_RECORD = 10;
+const AI_TIMEOUT_MS = 30000;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -169,13 +170,21 @@ async function handleNewSubmission(
         await sendMessage(token, chatId, '图片下载失败，请重试。');
         return;
       }
-      draft = await extractRecordFromImage(env.AI, env.AI_VISION_MODEL, buffer, text);
+      draft = await withTimeout(
+        extractRecordFromImage(env.AI, env.AI_VISION_MODEL, buffer, text),
+        AI_TIMEOUT_MS,
+        'Vision AI timed out'
+      );
     } else {
-      draft = await extractRecord(env.AI, env.AI_MODEL, text);
+      draft = await withTimeout(
+        extractRecord(env.AI, env.AI_MODEL, text),
+        AI_TIMEOUT_MS,
+        'Text AI timed out'
+      );
     }
   } catch (error) {
     console.error('AI extraction failed:', error);
-    await sendMessage(token, chatId, '整理失败，请重试或换个描述方式。');
+    await sendMessage(token, chatId, '整理超时或失败，请重试或换个描述方式。');
     return;
   }
 
@@ -286,6 +295,22 @@ function detectContentType(path: string, mimeType?: string): string {
     default:
       return 'image/jpeg';
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 }
 
 // ---- Telegram webhook payload type declarations ----
