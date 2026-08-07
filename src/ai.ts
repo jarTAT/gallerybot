@@ -87,7 +87,12 @@ function extractDraft(result: unknown, errMsg: string): DraftRecord {
   const json = tryParseJson(content);
   if (json) return normalize(json);
 
-  console.error('Unparseable response. Raw content:', JSON.stringify(content.slice(0, 500)));
+  console.error(
+    'Unparseable response. result=',
+    JSON.stringify(result).slice(0, 800),
+    'content=',
+    JSON.stringify(content.slice(0, 300))
+  );
   throw new Error(errMsg);
 }
 
