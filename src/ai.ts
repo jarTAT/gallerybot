@@ -51,6 +51,7 @@ export async function extractRecord(
   const json = tryParseJson(content);
   if (json) return normalize(json);
 
+  console.error('Unparseable text response. Raw content:', JSON.stringify(content.slice(0, 500)));
   throw new Error('AI returned unparseable response');
 }
 
