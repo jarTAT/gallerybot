@@ -10,7 +10,7 @@ const SYSTEM_PROMPT = `你是一名数据整理助手。用户发来一段中文
 字段规则（一律从原文中逐字复制）：
 - name：用户的姓名或昵称，原样复制；没有则 "未命名"
 - price：只取数字（如 800）；没有则 0
-- tags：用户列出的标签，取最多 6 个，每个原样复制（如 18岁, 173cm, 54kg, C）
+- tags：从「标签:」后用户列出的内容中，最多选 6 个简短短语，原样复制，不要重复；只取有实际意义的名词/特征，忽略纯描述性的长句。
 - city：城市名原样复制（如 深圳）；没有则 ""
 - district：区域原样复制（如 坂田）；没有则 ""
 - contact：联系方式原样复制（如 @kkqq12121）；没有则 ""
@@ -44,7 +44,10 @@ export async function extractRecord(
   ];
 
   const modelName = model || DEFAULT_MODEL;
-  const result = await ai.run(modelName, { messages } as never);
+  const result = await ai.run(modelName, {
+    messages,
+    max_tokens: 1024,
+  } as never);
 
   return extractDraft(result, 'AI returned unparseable response');
 }
