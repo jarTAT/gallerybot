@@ -46,5 +46,6 @@ export interface Env {
   AI: Ai;
   TELEGRAM_BOT_TOKEN: string;
   AI_MODEL?: string;
+  AI_VISION_MODEL?: string;
   ALLOWED_USERNAMES?: string;
 }

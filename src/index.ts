@@ -7,7 +7,7 @@ import {
   downloadFile,
   InlineKeyboardMarkup,
 } from './telegram';
-import { extractRecord } from './ai';
+import { extractRecord, extractRecordFromImage } from './ai';
 import { createPhotoRecord, addImageToPhoto, getPhoto } from './store';
 import { getSession, setSession, clearSession } from './session';
 
@@ -135,18 +135,21 @@ async function handleMessage(env: Env, message: TelegramMessage): Promise<void> 
   }
 
   // --- Idle ---
-  if (message.photo && message.photo.length > 0 && !text) {
-    await sendMessage(token, chatId, '请先发送文字描述，我会先整理成记录，确认后再接收图片。');
-    return;
-  }
-
-  await handleNewSubmission(env, chatId, text || '');
+  // New submission. If the message has a photo, recognize its content via vision;
+  // otherwise extract from the text.
+  await handleNewSubmission(env, chatId, text || '', message.photo);
 }
 
-async function handleNewSubmission(env: Env, chatId: number | string, text: string): Promise<void> {
+async function handleNewSubmission(
+  env: Env,
+  chatId: number | string,
+  text: string,
+  photo: TelegramPhotoSize[] | undefined
+): Promise<void> {
   const token = env.TELEGRAM_BOT_TOKEN;
-  if (!text.trim()) {
-    await sendMessage(token, chatId, '请发送一些文字描述，让我整理成记录。');
+
+  if (!text.trim() && !(photo && photo.length > 0)) {
+    await sendMessage(token, chatId, '请发送一些文字描述或一张图片，让我整理成记录。');
     return;
   }
 
@@ -154,7 +157,22 @@ async function handleNewSubmission(env: Env, chatId: number | string, text: stri
 
   let draft: DraftRecord;
   try {
-    draft = await extractRecord(env.AI, env.AI_MODEL, text);
+    if (photo && photo.length > 0) {
+      const largest = photo[photo.length - 1];
+      const info = await getFile(token, largest.file_id);
+      if (!info?.file_path) {
+        await sendMessage(token, chatId, '无法获取图片文件，请重试。');
+        return;
+      }
+      const buffer = await downloadFile(token, info.file_path);
+      if (!buffer) {
+        await sendMessage(token, chatId, '图片下载失败，请重试。');
+        return;
+      }
+      draft = await extractRecordFromImage(env.AI, env.AI_VISION_MODEL, buffer, text);
+    } else {
+      draft = await extractRecord(env.AI, env.AI_MODEL, text);
+    }
   } catch (error) {
     console.error('AI extraction failed:', error);
     await sendMessage(token, chatId, '整理失败，请重试或换个描述方式。');

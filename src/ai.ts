@@ -1,6 +1,7 @@
 import { DraftRecord } from './types';
 
 export const DEFAULT_MODEL = '@cf/qwen/qwen1.5-14b-chat-awq';
+export const DEFAULT_VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 
 const SYSTEM_PROMPT = `You extract structured photo-record data from a Chinese text message a photographer sends.
 Output ONLY a JSON object with no commentary, no markdown fences, matching exactly this shape:
@@ -15,6 +16,20 @@ Rules:
 - contact: any phone / WeChat / QQ / telegram / email found verbatim. If none, "".
 - link: any URL found (e.g. https://...). If none, "".
 Preserve the original Chinese values exactly. Do not invent values.`;
+
+const VISION_SYSTEM_PROMPT = `You look at a photo a photographer sends and extract structured photo-record data from the image content and any attached caption.
+Output JSON only, no commentary, no markdown fences, exactly:
+{"name": string, "price": number, "tags": string[], "city": string, "district": string, "contact": string, "link": string}
+
+Rules:
+- name: a short descriptive title describing the work/scene in the image (e.g. subject, genre, location). If none, use "未命名".
+- price: a plain number if a price is visible/mentioned, else 0.
+- tags: 2-6 short labels for the image content (e.g. 人像, 街拍, 婚纱, 风光). Empty array if none.
+- city: the city mentioned if any, else "".
+- district: smaller area/district if any, else "".
+- contact: any phone / WeChat / QQ / telegram / email found verbatim, else "".
+- link: any URL found, else "".
+Preserve original Chinese values exactly. Do not invent values.`;
 
 export async function extractRecord(
   ai: Ai,
@@ -37,6 +52,38 @@ export async function extractRecord(
   if (json) return normalize(json);
 
   throw new Error('AI returned unparseable response');
+}
+
+export async function extractRecordFromImage(
+  ai: Ai,
+  visionModel: string | undefined,
+  image: ArrayBuffer,
+  contextText: string
+): Promise<DraftRecord> {
+  const prompt = contextText.trim()
+    ? `这是摄影师发来的照片及文字描述，请识别照片内容并结合描述，提取一条摄影记录信息。\n文字描述：\n"""\n${contextText}\n"""`
+    : '这是摄影师发来的照片，请识别照片内容并提取一条摄影记录信息。';
+
+  const modelName = visionModel || DEFAULT_VISION_MODEL;
+  const result = await ai.run(modelName, {
+    messages: [
+      { role: 'system', content: VISION_SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: [
+          { type: 'image', image: new Uint8Array(image) },
+          { type: 'text', text: prompt },
+        ],
+      },
+    ],
+    max_tokens: 512,
+  } as never);
+
+  const content = extractText(result);
+  const json = tryParseJson(content);
+  if (json) return normalize(json);
+
+  throw new Error('Vision AI returned unparseable response');
 }
 
 function extractText(result: unknown): string {
