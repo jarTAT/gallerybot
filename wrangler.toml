@@ -19,6 +19,6 @@ binding = "AI"
 
 # Telegram bot token - set via `wrangler secret put TELEGRAM_BOT_TOKEN`
 [vars]
-# AI_MODEL = "@cf/zai-org/glm-4.7-flash"
+# AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
 # AI_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
 # ALLOWED_USERNAMES = "user1,user2"  # optional whitelist, empty = allow all
