@@ -1,6 +1,6 @@
 import { DraftRecord } from './types';
 
-export const DEFAULT_MODEL = '@cf/qwen/qwen1.5-14b-chat-awq';
+export const DEFAULT_MODEL = '@cf/zai-org/glm-4.7-flash';
 export const DEFAULT_VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 
 const SYSTEM_PROMPT = `You extract structured photo-record data from a Chinese text message a photographer sends.
