@@ -12,7 +12,7 @@ import { createPhotoRecord, addImageToPhoto, getPhoto } from './store';
 import { getSession, setSession, clearSession } from './session';
 
 const MAX_IMAGES_PER_RECORD = 10;
-const AI_TIMEOUT_MS = 30000;
+const AI_TIMEOUT_MS = 40000;
 
 // Message template sent when AI fails to parse, so the user can copy, fill in,
 // and resend a well-formed submission.

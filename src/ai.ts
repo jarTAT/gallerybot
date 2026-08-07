@@ -10,7 +10,7 @@ const SYSTEM_PROMPT = `你是一名数据整理助手。用户发来一段中文
 字段规则（一律从原文中逐字复制）：
 - name：用户的姓名或昵称，原样复制；没有则 "未命名"
 - price：只取数字（如 800）；没有则 0
-- tags：从「标签:」后用户列出的内容中，最多选 6 个简短短语，原样复制，不要重复；只取有实际意义的名词/特征，忽略纯描述性的长句。
+- tags：从「标签:」后用户列出的内容中，全部逐个复制，不要遗漏、不要重复、不要合并。
 - city：城市名原样复制（如 深圳）；没有则 ""
 - district：区域原样复制（如 坂田）；没有则 ""
 - contact：联系方式原样复制（如 @kkqq12121）；没有则 ""
@@ -189,7 +189,7 @@ function normalize(json: Record<string, unknown>): DraftRecord {
   return {
     name: asString(json.name) || '未命名',
     price,
-    tags: tags.slice(0, 6),
+    tags: tags.slice(0, 30),
     city: asString(json.city),
     district: asString(json.district),
     contact: asString(json.contact),
