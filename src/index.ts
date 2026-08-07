@@ -14,6 +14,28 @@ import { getSession, setSession, clearSession } from './session';
 const MAX_IMAGES_PER_RECORD = 10;
 const AI_TIMEOUT_MS = 30000;
 
+// Message template sent when AI fails to parse, so the user can copy, fill in,
+// and resend a well-formed submission.
+const MESSAGE_TEMPLATE = `我没有成功识别您发送的内容。请复制下面的模板，替换成您自己的信息后重新发送：
+
+姓名：（姓名或昵称）
+联系方式：（电话 / 微信 / Telegram）
+标签：（标签，用空格或逗号分隔）
+价格：（数字，如 800）
+城市：（城市）
+区域：（区/街道）
+描述：（其他想补充的内容）
+
+示例：
+姓名：小美
+联系方式：@xiaomei
+标签：人像 街拍 逆光
+价格：500
+城市：深圳
+区域：南山
+描述：风格清新，可约拍`;
+
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method !== 'POST') {
@@ -187,7 +209,7 @@ async function handleNewSubmission(
       'AI extraction failed:',
       error instanceof Error ? error.message : String(error)
     );
-    await sendMessage(token, chatId, '整理超时或失败，请重试或换个描述方式。');
+    await sendMessage(token, chatId, MESSAGE_TEMPLATE);
     return;
   }
 
