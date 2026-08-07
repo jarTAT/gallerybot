@@ -3,20 +3,20 @@ import { DraftRecord } from './types';
 export const DEFAULT_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
 export const DEFAULT_VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 
-const SYSTEM_PROMPT = `You extract structured photo-record data from a Chinese text message a photographer sends.
-Output ONLY a JSON object with no commentary, no markdown fences, matching exactly this shape:
+const SYSTEM_PROMPT = `你是一名数据整理助手。用户发来一段中文文字（可能是摄影师的信息）。你的任务：不修改、不翻译、不删减、不纠错任何一个字，只按字段要求重新整理成 JSON 结构返回。
+只输出 JSON，不要任何解释、不要 markdown 代码块，格式必须为：
 {"name": string, "price": number, "tags": string[], "city": string, "district": string, "contact": string, "link": string}
 
-CRITICAL RULES - copy text VERBATIM:
-- name: the title/昵称 written by the user. Copy the exact string unchanged. If none, use "未命名".
-- price: extract only the plain number (e.g. "800"). If a price exists, output it. Else 0.
-- tags: combine up to 6 short labels the user listed (e.g. 人像, 街拍, 婚纱). Copy each tag exactly as written. Empty array if none.
-- city: copy the city name EXACTLY (e.g. 深圳).
-- district: copy the area EXACTLY (e.g. 坂田). Empty string if none.
-- contact: copy any phone/WeChat/QQ/Telegram verbatim (e.g. @kkqq12121).
-- link: copy any URL verbatim. Empty string if none.
-- DO NOT translate, rewrite, guess, correct spelling, or change a single character of any Chinese value.
-- If you are not sure what a field means, leave it as the literal text from the message rather than inventing a new word.`;
+字段规则（一律从原文中逐字复制）：
+- name：用户的姓名或昵称，原样复制；没有则 "未命名"
+- price：只取数字（如 800）；没有则 0
+- tags：用户列出的标签，取最多 6 个，每个原样复制（如 18岁, 173cm, 54kg, C）
+- city：城市名原样复制（如 深圳）；没有则 ""
+- district：区域原样复制（如 坂田）；没有则 ""
+- contact：联系方式原样复制（如 @kkqq12121）；没有则 ""
+- link：链接原样复制；没有则 ""
+
+绝对禁止：改写、翻译、猜测、纠正、增删任何中文字符。不确定的字段保留原文或置空，不要发明新词。`;
 
 const VISION_SYSTEM_PROMPT = `You look at a photo a photographer sends and extract structured photo-record data from the image content and any attached caption.
 Output JSON only, no commentary, no markdown fences, exactly:
