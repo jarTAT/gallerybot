@@ -45,7 +45,7 @@ export async function extractRecord(
   const modelName = model || DEFAULT_MODEL;
   const result = await ai.run(modelName, { messages } as never);
 
-  return toDraft(result, 'AI returned unparseable response');
+  return extractDraft(result, 'AI returned unparseable response');
 }
 
 export async function extractRecordFromImage(
