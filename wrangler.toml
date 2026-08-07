@@ -14,7 +14,7 @@ binding = "R2"
 bucket_name = "stuffimg"
 
 # Cloudflare Workers AI
-[[ai]]
+[ai]
 binding = "AI"
 
 # Telegram bot token - set via `wrangler secret put TELEGRAM_BOT_TOKEN`
