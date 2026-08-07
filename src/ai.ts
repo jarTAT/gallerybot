@@ -68,14 +68,9 @@ export async function extractRecordFromImage(
   const result = await ai.run(modelName, {
     messages: [
       { role: 'system', content: VISION_SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: [
-          { type: 'image', image: new Uint8Array(image) },
-          { type: 'text', text: prompt },
-        ],
-      },
+      { role: 'user', content: prompt },
     ],
+    image: new Uint8Array(image),
     max_tokens: 512,
   } as never);
 
