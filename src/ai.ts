@@ -1,6 +1,6 @@
 import { DraftRecord } from './types';
 
-export const DEFAULT_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
+export const DEFAULT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 export const DEFAULT_VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 
 const SYSTEM_PROMPT = `你是一名数据整理助手。用户发来一段中文文字（可能是摄影师的信息）。你的任务：不修改、不翻译、不删减、不纠错任何一个字，只按字段要求重新整理成 JSON 结构返回。
