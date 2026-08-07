@@ -91,6 +91,20 @@ function extractText(result: unknown): string {
   if (typeof result === 'string') return result;
   if (Array.isArray(result)) return result.map(extractText).join('');
   const r = result as Record<string, unknown>;
+  // OpenAI-compatible chat completion: choices[].message.content
+  if (Array.isArray(r.choices)) {
+    const parts = (r.choices as unknown[])
+      .map((choice) => {
+        const c = choice as { message?: { content?: unknown }; text?: unknown };
+        const content = c.message?.content;
+        if (typeof content === 'string') return content;
+        if (Array.isArray(content)) return content.map(extractText).join('');
+        if (typeof c.text === 'string') return c.text;
+        return '';
+      })
+      .filter((s) => s.length > 0);
+    if (parts.length > 0) return parts.join('');
+  }
   if (typeof r.response === 'string') return r.response;
   if (Array.isArray(r.response)) return r.response.map(extractText).join('');
   if (typeof r.text === 'string') return r.text;

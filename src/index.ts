@@ -183,7 +183,10 @@ async function handleNewSubmission(
       );
     }
   } catch (error) {
-    console.error('AI extraction failed:', error);
+    console.error(
+      'AI extraction failed:',
+      error instanceof Error ? error.message : String(error)
+    );
     await sendMessage(token, chatId, '整理超时或失败，请重试或换个描述方式。');
     return;
   }
