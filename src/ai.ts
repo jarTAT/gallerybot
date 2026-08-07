@@ -7,15 +7,16 @@ const SYSTEM_PROMPT = `You extract structured photo-record data from a Chinese t
 Output ONLY a JSON object with no commentary, no markdown fences, matching exactly this shape:
 {"name": string, "price": number, "tags": string[], "city": string, "district": string, "contact": string, "link": string}
 
-Rules:
-- name: a short descriptive title from the message (e.g. topic/subject/location). If none, use "未命名".
-- price: a plain number (Chinese 元/万 -> numeric yuan). If none, 0.
-- tags: 2-6 short lowercase topics/labels (e.g. 人像, 街拍, 婚纱, 风光). Empty array if none.
-- city: the city mentioned (Chinese). If none, "".
-- district: smaller area/district mentioned if any, else "".
-- contact: any phone / WeChat / QQ / telegram / email found verbatim. If none, "".
-- link: any URL found (e.g. https://...). If none, "".
-Preserve the original Chinese values exactly. Do not invent values.`;
+CRITICAL RULES - copy text VERBATIM:
+- name: the title/昵称 written by the user. Copy the exact string unchanged. If none, use "未命名".
+- price: extract only the plain number (e.g. "800"). If a price exists, output it. Else 0.
+- tags: combine up to 6 short labels the user listed (e.g. 人像, 街拍, 婚纱). Copy each tag exactly as written. Empty array if none.
+- city: copy the city name EXACTLY (e.g. 深圳).
+- district: copy the area EXACTLY (e.g. 坂田). Empty string if none.
+- contact: copy any phone/WeChat/QQ/Telegram verbatim (e.g. @kkqq12121).
+- link: copy any URL verbatim. Empty string if none.
+- DO NOT translate, rewrite, guess, correct spelling, or change a single character of any Chinese value.
+- If you are not sure what a field means, leave it as the literal text from the message rather than inventing a new word.`;
 
 const VISION_SYSTEM_PROMPT = `You look at a photo a photographer sends and extract structured photo-record data from the image content and any attached caption.
 Output JSON only, no commentary, no markdown fences, exactly:
