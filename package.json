@@ -1,0 +1,16 @@
+{
+  "name": "gallerybot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Telegram bot that collects photos into gallery via Cloudflare Workers AI",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240806.0",
+    "typescript": "^5.5.4",
+    "wrangler": "^3.78.0"
+  }
+}

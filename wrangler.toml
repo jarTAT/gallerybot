@@ -1,0 +1,23 @@
+name = "gallerybot"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Bind to the same KV namespace used by the gallery app
+[[kv_namespaces]]
+binding = "KV"
+id = "4ebf2d12b55c4cc3bdc38898f82ac80c"
+
+# Bind to the same R2 bucket used by the gallery app
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "stuffimg"
+
+# Cloudflare Workers AI
+[[ai]]
+binding = "AI"
+
+# Telegram bot token - set via `wrangler secret put TELEGRAM_BOT_TOKEN`
+[vars]
+# AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+# ALLOWED_USERNAMES = "user1,user2"  # optional whitelist, empty = allow all
