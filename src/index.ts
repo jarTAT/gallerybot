@@ -279,7 +279,7 @@ async function handleCallback(env: Env, cb: TelegramCallbackQuery): Promise<void
     }
     case 'edit': {
       await answerCallbackQuery(token, cb.id);
-      await setSession(env, chatId, { step: 'awaiting_confirm', draft: session.draft, photoId: null, createdAt: Date.now() });
+      await clearSession(env, chatId);
       await editMessageText(token, chatId, messageId, '请发送修改后的完整文字描述，将重新整理。');
       break;
     }
