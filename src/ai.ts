@@ -45,14 +45,7 @@ export async function extractRecord(
   const modelName = model || DEFAULT_MODEL;
   const result = await ai.run(modelName, { messages } as never);
 
-  const content = extractText(result);
-
-  // Try to find the JSON object in the response
-  const json = tryParseJson(content);
-  if (json) return normalize(json);
-
-  console.error('Unparseable text response. Raw content:', JSON.stringify(content.slice(0, 500)));
-  throw new Error('AI returned unparseable response');
+  return toDraft(result, 'AI returned unparseable response');
 }
 
 export async function extractRecordFromImage(
@@ -75,11 +68,54 @@ export async function extractRecordFromImage(
     max_tokens: 512,
   } as never);
 
+  return extractDraft(result, 'Vision AI returned unparseable response');
+}
+
+function extractDraft(result: unknown, errMsg: string): DraftRecord {
+  // 1) If the model returned a structured object (e.g. { response: {...} } or the
+  //    whole result already has the fields), normalize it directly.
+  const direct = structuredFromAny(result);
+  if (direct) return normalize(direct);
+
+  // 2) Otherwise extract the text (choices[0].message.content / response string)
+  //    and parse the JSON out of it, handling double-encoding.
   const content = extractText(result);
   const json = tryParseJson(content);
   if (json) return normalize(json);
 
-  throw new Error('Vision AI returned unparseable response');
+  console.error('Unparseable response. Raw content:', JSON.stringify(content.slice(0, 500)));
+  throw new Error(errMsg);
+}
+
+// Take the first object among {response}, {choices[].message.content}, or the
+// result itself that carries the DraftRecord fields (name/price/...).
+function structuredFromAny(result: unknown): Record<string, unknown> | null {
+  if (result == null || typeof result !== 'object') return null;
+  const r = result as Record<string, unknown>;
+
+  const isObj = (v: unknown): v is Record<string, unknown> =>
+    v != null && typeof v === 'object' && !Array.isArray(v);
+
+  if (isObj(r.response) && hasDraftFields(r.response)) return r.response as Record<string, unknown>;
+
+  if (Array.isArray(r.choices)) {
+    for (const choice of r.choices) {
+      const msg = (choice as { message?: unknown })?.message;
+      if (isObj(msg)) {
+        const content = (msg as Record<string, unknown>).content;
+        if (typeof content === 'string') {
+          const parsed = tryParseJson(content);
+          if (parsed && hasDraftFields(parsed)) return parsed;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function hasDraftFields(obj: Record<string, unknown>): boolean {
+  return 'name' in obj || 'price' in obj || 'city' in obj || 'tags' in obj;
 }
 
 function extractText(result: unknown): string {
