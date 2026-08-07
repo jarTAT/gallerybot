@@ -33,7 +33,7 @@ const MESSAGE_TEMPLATE = `我没有成功识别您发送的内容。请复制下
 价格：500
 城市：深圳
 区域：南山
-描述：风格清新，可约拍`;
+链接：https://example.com`;
 
 
 export default {
