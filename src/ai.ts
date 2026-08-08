@@ -51,14 +51,19 @@ export async function recognizeImageText(
   // the image is silently ignored, so keep the prompt/image form.
   const base64 = bytesToBase64(new Uint8Array(image));
   const result = await ai.run(modelName, {
-    prompt: '请识别这张图片中的文字，原样返回，保留换行和标点。',
+    prompt:
+      '请只输出图片中出现的全部文字原文，逐字复制，包括标点和换行。' +
+      '禁止添加任何你自己的话、标题、总结、解释或前后缀。' +
+      '如果图片里没有任何文字，输出一个空字符串。',
     image: `data:image/png;base64,${base64}`,
     max_tokens: 1024,
+    temperature: 0,
   } as never);
 
   // The vision model returns { response: string } (non-chat) or an OpenAI
   // compatible { choices[].message.content } shape depending on the endpoint.
-  const text = extractText(result);
+  let text = extractText(result);
+  text = stripOcrSurroundings(text);
   if (text.trim()) return text.trim();
   console.error(
     'OCR returned empty. result=',
@@ -74,6 +79,23 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
+}
+
+// The vision model sometimes wraps the raw text with its own commentary
+// (e.g. "这是一张截屏，显示… 截屏中的文字是："). Strip such surroundings and
+// keep only the bulk of the output.
+function stripOcrSurroundings(text: string): string {
+  let s = text.trim();
+  // Cut at the common "截屏中的文字是：" markers and keep everything after.
+  const markers = ['截屏中的文字是：', '图片中的文字是：', '以下是识别出的文字：', '文字内容如下：'];
+  for (const m of markers) {
+    const idx = s.lastIndexOf(m);
+    if (idx >= 0) {
+      const after = s.slice(idx + m.length).trim();
+      if (after) return after;
+    }
+  }
+  return s;
 }
 
 function extractDraft(result: unknown, errMsg: string): DraftRecord {
