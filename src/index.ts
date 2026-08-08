@@ -8,7 +8,7 @@ import {
   InlineKeyboardMarkup,
 } from './telegram';
 import { extractRecord, recognizeImageText } from './ai';
-import { createPhotoRecord, addImageToPhoto, getPhoto } from './store';
+import { createPhotoRecord, addImageToPhoto, getPhoto, findExistingByDraft } from './store';
 import { getSession, setSession, clearSession } from './session';
 
 const MAX_IMAGES_PER_RECORD = 10;
@@ -158,6 +158,16 @@ async function handleMessage(env: Env, message: TelegramMessage): Promise<void> 
     return;
   }
 
+  // --- Step: awaiting duplicate decision ---
+  if (session?.step === 'awaiting_dup' && session.draft) {
+    await sendMessage(
+      token,
+      chatId,
+      '检测到可能重复的记录，请点击上方按钮选择「⚠️ 仍然保存」或「❌ 取消」。'
+    );
+    return;
+  }
+
   // --- Idle ---
   // If the message carries a photo, recognize the text inside it via vision AI,
   // reply with that text, and end this round (no confirmation / no saving).
@@ -279,28 +289,41 @@ async function handleCallback(env: Env, cb: TelegramCallbackQuery): Promise<void
 
   switch (cb.data) {
     case 'confirm': {
+      await answerCallbackQuery(token, cb.id, '正在检查重复记录...');
+      const duplicates = await findExistingByDraft(env, session.draft);
+      if (duplicates.length > 0) {
+        await setSession(env, chatId, {
+          step: 'awaiting_dup',
+          draft: session.draft,
+          photoId: null,
+          createdAt: Date.now(),
+        });
+        await editMessageText(
+          token,
+          chatId,
+          messageId,
+          formatDuplicateWarning(session.draft, duplicates),
+          {
+            inline_keyboard: [
+              [{ text: '⚠️ 仍然保存', callback_data: 'dup_confirm' }],
+              [{ text: '❌ 取消', callback_data: 'dup_cancel' }],
+            ],
+          }
+        );
+        return;
+      }
+      await saveConfirmedRecord(env, chatId, messageId, session.draft);
+      break;
+    }
+    case 'dup_confirm': {
       await answerCallbackQuery(token, cb.id, '已确认，正在保存...');
-      const photo = await createPhotoRecord(env, session.draft);
-      await setSession(env, chatId, {
-        step: 'awaiting_image',
-        draft: session.draft,
-        photoId: photo.id,
-        createdAt: Date.now(),
-      });
-      await editMessageText(
-        token,
-        chatId,
-        messageId,
-        `✅ 已保存记录：${photo.name}\n现在请发送该作品的图片（一张或多张）。`
-      );
-      await sendMessage(
-        token,
-        chatId,
-        '请发送图片，发完回复 /done 或点击下方按钮完成。',
-        {
-          inline_keyboard: [[{ text: '✅ 已完成', callback_data: 'done' }]],
-        }
-      );
+      await saveConfirmedRecord(env, chatId, messageId, session.draft);
+      break;
+    }
+    case 'dup_cancel': {
+      await answerCallbackQuery(token, cb.id, '已取消。');
+      await clearSession(env, chatId);
+      await editMessageText(token, chatId, messageId, '已取消本次操作。');
       break;
     }
     case 'edit': {
@@ -331,6 +354,55 @@ function formatDraft(draft: DraftRecord): string {
     `📞 联系方式：${draft.contact || '—'}`,
     `🔗 链接：${draft.link || '—'}`,
   ].join('\n');
+}
+
+function formatDuplicateWarning(draft: DraftRecord, duplicates: Photo[]): string {
+  const lines: string[] = [
+    '⚠️ 检测到可能重复的记录：',
+    '',
+    `📋 本次信息：${draft.name || '—'}（${draft.contact || '—'}）`,
+    '',
+    '以下已有记录的「名称」或「联系方式」与本次相同：',
+    '',
+  ];
+  duplicates.forEach((p, i) => {
+    const price = typeof p.price === 'number' && p.price > 0 ? '¥' + p.price : '—';
+    lines.push(
+      `${i + 1}. ${p.name || '—'}｜${p.contact || '—'}｜${p.city || '—'} ${p.district || '—'}｜${price}`
+    );
+  });
+  lines.push('', '如确认仍要保存，请选择「⚠️ 仍然保存」；否则点击「❌ 取消」。');
+  return lines.join('\n');
+}
+
+async function saveConfirmedRecord(
+  env: Env,
+  chatId: number | string,
+  messageId: number,
+  draft: DraftRecord
+): Promise<void> {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  const photo = await createPhotoRecord(env, draft);
+  await setSession(env, chatId, {
+    step: 'awaiting_image',
+    draft,
+    photoId: photo.id,
+    createdAt: Date.now(),
+  });
+  await editMessageText(
+    token,
+    chatId,
+    messageId,
+    `✅ 已保存记录：${photo.name}\n现在请发送该作品的图片（一张或多张）。`
+  );
+  await sendMessage(
+    token,
+    chatId,
+    '请发送图片，发完回复 /done 或点击下方按钮完成。',
+    {
+      inline_keyboard: [[{ text: '✅ 已完成', callback_data: 'done' }]],
+    }
+  );
 }
 
 function detectContentType(path: string, mimeType?: string): string {

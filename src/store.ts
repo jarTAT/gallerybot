@@ -93,3 +93,32 @@ async function addToIndex(env: Env, photoId: string): Promise<void> {
     await env.KV.put(KEYS.photoIndex, JSON.stringify(index));
   }
 }
+
+export async function listPhotos(env: Env): Promise<Photo[]> {
+  const raw = await env.KV.get(KEYS.photoIndex);
+  const index: string[] = raw ? (JSON.parse(raw) as string[]) : [];
+  const photos: Photo[] = [];
+  for (const id of index) {
+    const photo = await getPhoto(env, id);
+    if (photo) photos.push(photo);
+  }
+  return photos;
+}
+
+// Returns existing records whose name or contact matches the draft
+// (case-insensitive exact match, trimmed).
+export async function findExistingByDraft(
+  env: Env,
+  draft: DraftRecord
+): Promise<Photo[]> {
+  const name = (draft.name || '').trim().toLowerCase();
+  const contact = (draft.contact || '').trim().toLowerCase();
+  if (!name && !contact) return [];
+
+  const photos = await listPhotos(env);
+  return photos.filter((p) => {
+    const pName = (p.name || '').trim().toLowerCase();
+    const pContact = (p.contact || '').trim().toLowerCase();
+    return (name && pName === name) || (contact && pContact === contact);
+  });
+}

@@ -34,7 +34,7 @@ export interface DraftRecord {
 
 // Session state for a chat, stored in KV.
 export interface BotSession {
-  step: 'idle' | 'awaiting_confirm' | 'awaiting_image';
+  step: 'idle' | 'awaiting_confirm' | 'awaiting_image' | 'awaiting_dup';
   draft: DraftRecord | null;
   photoId: string | null; // set after record saved, while awaiting images
   createdAt: number;
