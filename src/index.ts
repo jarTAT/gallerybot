@@ -7,7 +7,7 @@ import {
   downloadFile,
   InlineKeyboardMarkup,
 } from './telegram';
-import { extractRecord, extractRecordFromImage } from './ai';
+import { extractRecord, recognizeImageText } from './ai';
 import { createPhotoRecord, addImageToPhoto, getPhoto } from './store';
 import { getSession, setSession, clearSession } from './session';
 
@@ -87,6 +87,7 @@ async function handleMessage(env: Env, message: TelegramMessage): Promise<void> 
   const token = env.TELEGRAM_BOT_TOKEN;
   const session = await getSession(env, chatId);
   const text = (message.text || message.caption || '').trim();
+  const photo = message.photo;
 
   // Commands
   if (text === '/start' || text === '/cancel') {
@@ -158,21 +159,65 @@ async function handleMessage(env: Env, message: TelegramMessage): Promise<void> 
   }
 
   // --- Idle ---
-  // New submission. If the message has a photo, recognize its content via vision;
-  // otherwise extract from the text.
-  await handleNewSubmission(env, chatId, text || '', message.photo);
+  // If the message carries a photo, recognize the text inside it via vision AI,
+  // reply with that text, and end this round (no confirmation / no saving).
+  if (photo && photo.length > 0) {
+    await recognizeImageAndReply(env, chatId, photo);
+    return;
+  }
+
+  // Otherwise extract a draft from the text and request confirmation.
+  await handleNewSubmission(env, chatId, text);
+}
+
+async function recognizeImageAndReply(
+  env: Env,
+  chatId: number | string,
+  photo: TelegramPhotoSize[]
+): Promise<void> {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  await sendMessage(token, chatId, '正在识别图片中的文字，请稍候...');
+
+  try {
+    const largest = photo[photo.length - 1];
+    const info = await getFile(token, largest.file_id);
+    if (!info?.file_path) {
+      await sendMessage(token, chatId, '无法获取图片文件，请重试。');
+      return;
+    }
+    const buffer = await downloadFile(token, info.file_path);
+    if (!buffer) {
+      await sendMessage(token, chatId, '图片下载失败，请重试。');
+      return;
+    }
+    const recognized = await withTimeout(
+      recognizeImageText(env.AI, env.AI_VISION_MODEL, buffer),
+      AI_TIMEOUT_MS,
+      'Vision AI timed out'
+    );
+    if (!recognized) {
+      await sendMessage(token, chatId, '未能识别出图片中的文字。');
+      return;
+    }
+    await sendMessage(token, chatId, recognized);
+  } catch (error) {
+    console.error(
+      'OCR failed:',
+      error instanceof Error ? error.message : String(error)
+    );
+    await sendMessage(token, chatId, MESSAGE_TEMPLATE);
+  }
 }
 
 async function handleNewSubmission(
   env: Env,
   chatId: number | string,
-  text: string,
-  photo: TelegramPhotoSize[] | undefined
+  text: string
 ): Promise<void> {
   const token = env.TELEGRAM_BOT_TOKEN;
 
-  if (!text.trim() && !(photo && photo.length > 0)) {
-    await sendMessage(token, chatId, '请发送一些文字描述或一张图片，让我整理成记录。');
+  if (!text.trim()) {
+    await sendMessage(token, chatId, '请发送一些文字描述，让我整理成记录。');
     return;
   }
 
@@ -180,30 +225,11 @@ async function handleNewSubmission(
 
   let draft: DraftRecord;
   try {
-    if (photo && photo.length > 0) {
-      const largest = photo[photo.length - 1];
-      const info = await getFile(token, largest.file_id);
-      if (!info?.file_path) {
-        await sendMessage(token, chatId, '无法获取图片文件，请重试。');
-        return;
-      }
-      const buffer = await downloadFile(token, info.file_path);
-      if (!buffer) {
-        await sendMessage(token, chatId, '图片下载失败，请重试。');
-        return;
-      }
-      draft = await withTimeout(
-        extractRecordFromImage(env.AI, env.AI_VISION_MODEL, buffer, text),
-        AI_TIMEOUT_MS,
-        'Vision AI timed out'
-      );
-    } else {
-      draft = await withTimeout(
-        extractRecord(env.AI, env.AI_MODEL, text),
-        AI_TIMEOUT_MS,
-        'Text AI timed out'
-      );
-    }
+    draft = await withTimeout(
+      extractRecord(env.AI, env.AI_MODEL, text),
+      AI_TIMEOUT_MS,
+      'Text AI timed out'
+    );
   } catch (error) {
     console.error(
       'AI extraction failed:',

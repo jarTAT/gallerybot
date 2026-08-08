@@ -18,19 +18,7 @@ const SYSTEM_PROMPT = `你是一名数据整理助手。用户发来一段中文
 
 绝对禁止：改写、翻译、猜测、纠正、增删任何中文字符。不确定的字段保留原文或置空，不要发明新词。`;
 
-const VISION_SYSTEM_PROMPT = `You look at a photo a photographer sends and extract structured photo-record data from the image content and any attached caption.
-Output JSON only, no commentary, no markdown fences, exactly:
-{"name": string, "price": number, "tags": string[], "city": string, "district": string, "contact": string, "link": string}
-
-Rules:
-- name: a short descriptive title describing the work/scene in the image (e.g. subject, genre, location). If none, use "未命名".
-- price: a plain number if a price is visible/mentioned, else 0.
-- tags: 2-6 short labels for the image content (e.g. 人像, 街拍, 婚纱, 风光). Empty array if none.
-- city: the city mentioned if any, else "".
-- district: smaller area/district if any, else "".
-- contact: any phone / WeChat / QQ / telegram / email found verbatim, else "".
-- link: any URL found, else "".
-Preserve original Chinese values exactly. Do not invent values.`;
+const OCR_SYSTEM_PROMPT = `你是 OCR 文字识别助手。请识别图片中的所有文字，并原样返回，保留原始换行、空格和标点。不要总结、不要翻译、不要改写、不要添加任何解释或额外文字。`;
 
 export async function extractRecord(
   ai: Ai,
@@ -52,27 +40,33 @@ export async function extractRecord(
   return extractDraft(result, 'AI returned unparseable response');
 }
 
-export async function extractRecordFromImage(
+export async function recognizeImageText(
   ai: Ai,
   visionModel: string | undefined,
-  image: ArrayBuffer,
-  contextText: string
-): Promise<DraftRecord> {
-  const prompt = contextText.trim()
-    ? `这是摄影师发来的照片及文字描述，请识别照片内容并结合描述，提取一条摄影记录信息。\n文字描述：\n"""\n${contextText}\n"""`
-    : '这是摄影师发来的照片，请识别照片内容并提取一条摄影记录信息。';
-
+  image: ArrayBuffer
+): Promise<string> {
   const modelName = visionModel || DEFAULT_VISION_MODEL;
   const result = await ai.run(modelName, {
     messages: [
-      { role: 'system', content: VISION_SYSTEM_PROMPT },
-      { role: 'user', content: prompt },
+      { role: 'system', content: OCR_SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: '请识别这张图片中的文字，原样返回。' +
+          (image.byteLength > 0 ? '' : ''),
+      },
     ],
     image: new Uint8Array(image),
-    max_tokens: 512,
+    max_tokens: 1024,
   } as never);
 
-  return extractDraft(result, 'Vision AI returned unparseable response');
+  // The vision model returns { choices[].message.content } or a raw string.
+  const text = extractText(result);
+  if (text.trim()) return text.trim();
+  console.error(
+    'OCR returned empty. result=',
+    JSON.stringify(result).slice(0, 500)
+  );
+  return '';
 }
 
 function extractDraft(result: unknown, errMsg: string): DraftRecord {
