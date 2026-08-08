@@ -18,8 +18,6 @@ const SYSTEM_PROMPT = `你是一名数据整理助手。用户发来一段中文
 
 绝对禁止：改写、翻译、猜测、纠正、增删任何中文字符。不确定的字段保留原文或置空，不要发明新词。`;
 
-const OCR_SYSTEM_PROMPT = `你是 OCR 文字识别助手。请识别图片中的所有文字，并原样返回，保留原始换行、空格和标点。不要总结、不要翻译、不要改写、不要添加任何解释或额外文字。`;
-
 export async function extractRecord(
   ai: Ai,
   model: string | undefined,
@@ -46,20 +44,20 @@ export async function recognizeImageText(
   image: ArrayBuffer
 ): Promise<string> {
   const modelName = visionModel || DEFAULT_VISION_MODEL;
+
+  // Llama 3.2 Vision (Workers AI) accepts the image as a base64 data URI
+  // passed via the top-level `image` param together with a plain `prompt`.
+  // Using `messages` here fails with AiError 3030 ("no user messages") and
+  // the image is silently ignored, so keep the prompt/image form.
+  const base64 = bytesToBase64(new Uint8Array(image));
   const result = await ai.run(modelName, {
-    messages: [
-      { role: 'system', content: OCR_SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: '请识别这张图片中的文字，原样返回。' +
-          (image.byteLength > 0 ? '' : ''),
-      },
-    ],
-    image: new Uint8Array(image),
+    prompt: '请识别这张图片中的文字，原样返回，保留换行和标点。',
+    image: `data:image/png;base64,${base64}`,
     max_tokens: 1024,
   } as never);
 
-  // The vision model returns { choices[].message.content } or a raw string.
+  // The vision model returns { response: string } (non-chat) or an OpenAI
+  // compatible { choices[].message.content } shape depending on the endpoint.
   const text = extractText(result);
   if (text.trim()) return text.trim();
   console.error(
@@ -67,6 +65,15 @@ export async function recognizeImageText(
     JSON.stringify(result).slice(0, 500)
   );
   return '';
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 }
 
 function extractDraft(result: unknown, errMsg: string): DraftRecord {
